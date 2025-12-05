@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>背多分</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    
+    <style>
+        :root {
+            /* M3 Color Tokens (Teal Theme) */
+            --md-primary: #006A6A;
+            --md-on-primary: #FFFFFF;
+            --md-primary-container: #6FF7F7;
+            --md-surface: #FAFDFC;
+            --md-surface-variant: #DAE5E4;
+            --md-outline: #6F7979;
+            --md-error: #BA1A1A;
+            --md-success: #146c2e;
+            
+            --radius: 16px;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--md-surface);
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            color: #191C1C;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px; /* Mobile app feel */
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* App Bar */
+        .app-bar {
+            padding: 16px 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .app-bar h1 {
+            font-size: 22px;
+            margin: 0;
+            color: var(--md-primary);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: var(--md-surface-variant);
+            border-radius: 50px;
+            padding: 4px;
+            margin-bottom: 16px;
+        }
+        .tab {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: 0.3s;
+            color: #3F4948;
+        }
+        .tab.active {
+            background-color: var(--md-primary);
+            color: var(--md-on-primary);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        /* Content Sections */
+        .view-section {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        .view-section.active {
+            display: block;
+        }
+
+        /* Input Form */
+        .input-group {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        label {
+            font-size: 12px;
+            color: var(--md-outline);
+            font-weight: 500;
+            margin-left: 4px;
+        }
+        input, textarea {
+            padding: 16px;
+            border: 1px solid var(--md-outline);
+            border-radius: 8px;
+            font-size: 16px;
+            background: transparent;
+            font-family: inherit;
+        }
+        input:focus, textarea:focus {
+            outline: 2px solid var(--md-primary);
+            border-color: transparent;
+        }
+        .btn-primary {
+            background-color: var(--md-primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 100px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: filter 0.2s;
+        }
+        .btn-primary:hover {
+            filter: brightness(1.1);
+        }
+
+        /* Quiz Card */
+        .quiz-card {
+            background: #fff;
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            text-align: center;
+            border: 1px solid #E0E0E0;
+        }
+        .term-display {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--md-primary);
+            margin-bottom: 8px;
+        }
+        .example-display {
+            font-style: italic;
+            color: var(--md-outline);
+            margin-bottom: 24px;
+            min-height: 40px;
+        }
+
+        /* Options Grid */
+        .options-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .option-btn {
+            background: var(--md-surface);
+            border: 1px solid var(--md-outline);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: left;
+            font-size: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #191C1C;
+        }
+        .option-btn:hover {
+            background-color: #F0F5F5;
+        }
+        
+        /* Quiz States */
+        .option-btn.correct {
+            background-color: #E6F6E9;
+            border-color: var(--md-success);
+            color: var(--md-success);
+            font-weight: bold;
+        }
+        .option-btn.wrong {
+            background-color: #FFEBEE;
+            border-color: var(--md-error);
+            color: var(--md-error);
+        }
+
+        /* Floating Message */
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #323232;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 14px;
+            opacity: 0;
+            transition: 0.3s;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            bottom: 40px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .mode-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #3F4948;
+        }
+        .mode-btn.active {
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            color: var(--md-primary);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="app-bar">
+            <span class="material-icons-round" style="color:var(--md-primary); font-size: 32px;">school</span>
+            <h1>背多分</h1>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('quiz')">開始測驗</div>
+            <div class="tab" onclick="switchTab('add')">新增單字</div>
+            <div class="tab" onclick="switchTab('bulk')">批量新增</div>
+            <div class="tab" onclick="switchTab('sets')">單字集</div>
+            <div class="tab" onclick="switchTab('settings')">設定</div>
+        </div>
+
+        <div id="view-quiz" class="view-section active">
+            <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center;">
+                <div style="flex: 1;">
+                    <label style="margin-left: 4px;">選擇單字集：</label>
+                    <select id="quiz-set-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                        <option value="all">全部單字</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label style="margin-left: 4px;">測驗模式：</label>
+                    <select id="quiz-mode-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                        <option value="learning">學習模式 (無限刷題)</option>
+                        <option value="exam">考試模式 (10題計分)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="quiz-container">
+                <!-- Progress Bar for Exam Mode -->
+                <div id="exam-progress" style="display: none; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 12px; color: var(--md-outline); margin-bottom: 4px;">
+                        <span>進度</span>
+                        <span id="progress-text">1 / 10</span>
+                    </div>
+                    <div style="height: 6px; background: var(--md-surface-variant); border-radius: 3px; overflow: hidden;">
+                        <div id="progress-bar" style="height: 100%; background: var(--md-primary); width: 10%;"></div>
+                    </div>
+                </div>
+
+                <div class="quiz-card">
+                    <div class="term-display" id="q-term">Loading...</div>
+                    <div class="example-display" id="q-example"></div>
+                </div>
+                
+                <h3 style="font-size: 14px; color: var(--md-outline); margin-top: 24px;">選擇正確的定義：</h3>
+                
+                <div class="options-grid" id="options-container">
+                </div>
+
+                <button class="btn-primary" id="next-btn" onclick="nextQuestion()" style="margin-top: 24px; display: none;">
+                    下一題 <span class="material-icons-round">arrow_forward</span>
+                </button>
+            </div>
+
+            <!-- Exam Result View -->
+            <div id="exam-result" style="display: none; text-align: center;">
+                <div style="font-size: 64px; font-weight: bold; color: var(--md-primary); margin: 20px 0;" id="score-display">80</div>
+                <div style="font-size: 18px; color: var(--md-outline); margin-bottom: 30px;">最終得分</div>
+                
+                <div id="ai-analysis-container" style="text-align: left; background: #fff; padding: 20px; border-radius: 16px; border: 1px solid #E0E0E0; margin-bottom: 20px; display: none;">
+                    <h3 style="margin-top: 0; color: var(--md-primary); display: flex; align-items: center; gap: 8px;">
+                        <span class="material-icons-round">psychology</span> AI 分析與建議
+                    </h3>
+                    <div id="ai-analysis-content" style="white-space: pre-wrap; line-height: 1.6; color: #444;"></div>
+                </div>
+
+                <button class="btn-primary" onclick="resetQuiz()">
+                    <span class="material-icons-round">refresh</span> 重新測驗
+                </button>
+            </div>
+            
+            <div id="error-msg" style="text-align: center; color: var(--md-outline); display: none; margin-top: 40px;">
+                <span class="material-icons-round" style="font-size: 48px;">info</span>
+                <p>單字量不足，請先新增至少 4 個單字。</p>
+            </div>
+        </div>
+
+        <div id="view-add" class="view-section">
+            <div class="input-group">
+                <label>選擇單字集</label>
+                <select id="add-set-select" style="padding: 16px; border-radius: 8px; border: 1px solid var(--md-outline);">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+            <div class="input-group">
+                <label>單字 (Word)</label>
+                <input type="text" id="inp-term" placeholder="Ex: Serendipity">
+            </div>
+            <div class="input-group">
+                <label>中文定義 (Definition)</label>
+                <input type="text" id="inp-def" placeholder="Ex: 意外發現珍奇事物的機緣">
+            </div>
+            <div class="input-group">
+                <label>例句 (Example Sentence)</label>
+                <textarea id="inp-ex" rows="3" placeholder="Ex: Meeting my old friend was pure serendipity."></textarea>
+            </div>
+            <button class="btn-primary" onclick="submitWord()">
+                <span class="material-icons-round">save</span> 儲存到資料庫
+            </button>
+        </div>
+
+        <div id="view-bulk" class="view-section">
+            <div class="input-group" style="margin-bottom: 16px;">
+                <label>選擇單字集</label>
+                <select id="bulk-set-select" style="padding: 16px; border-radius: 8px; border: 1px solid var(--md-outline); width: 100%;">
+                    <!-- Populated by JS -->
+                </select>
+            </div>
+
+            <!-- Toggle Mode -->
+            <div style="display: flex; gap: 10px; margin-bottom: 16px; background: var(--md-surface-variant); padding: 4px; border-radius: 12px;">
+                <button id="btn-mode-manual" class="mode-btn active" onclick="setBulkMode('manual')">手動輸入</button>
+                <button id="btn-mode-ai" class="mode-btn" onclick="setBulkMode('ai')">AI 自動生成</button>
+            </div>
+
+            <!-- Manual Mode -->
+            <div id="bulk-manual">
+                <div class="input-group">
+                    <label>批量輸入 (每行格式: 單字 | 定義 | 例句)</label>
+                    <textarea id="inp-bulk" rows="10" placeholder="Ephemeral | 短暫的 | Fashion is ephemeral.&#10;Serendipity | 機緣 | Meeting you was serendipity."></textarea>
+                </div>
+                <button class="btn-primary" onclick="submitBulkWords()">
+                    <span class="material-icons-round">playlist_add</span> 批量儲存
+                </button>
+                <div style="margin-top: 10px; font-size: 12px; color: var(--md-outline);">
+                    * 使用 | 分隔：單字 | 定義 | 例句 (例句可選)
+                </div>
+            </div>
+
+            <!-- AI Mode -->
+            <div id="bulk-ai" style="display: none;">
+                <div class="input-group">
+                    <label>單字列表 (每行一個單字)</label>
+                    <textarea id="inp-ai-words" rows="8" placeholder="Ephemeral&#10;Serendipity&#10;Resilient"></textarea>
+                </div>
+                <button class="btn-primary" id="btn-ai-submit" onclick="submitAiWords()">
+                    <span class="material-icons-round">auto_awesome</span> AI 生成並儲存
+                </button>
+                <div id="ai-loading" style="display: none; text-align: center; margin-top: 10px; color: var(--md-primary);">
+                    <span class="material-icons-round" style="animation: spin 1s linear infinite;">refresh</span>
+                    正在生成中...
+                </div>
+            </div>
+        </div>
+
+        <div id="view-sets" class="view-section">
+            <div class="input-group">
+                <label>新增單字集</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="inp-new-set" placeholder="Ex: 多益單字, 期中考..." style="flex: 1;">
+                    <button class="btn-primary" onclick="createSet()" style="width: auto; padding: 0 24px;">
+                        <span class="material-icons-round">add</span>
+                    </button>
+                </div>
+            </div>
+            
+            <h3 style="font-size: 16px; color: var(--md-primary); margin-top: 24px;">現有單字集</h3>
+            <div id="sets-list" style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <div id="view-settings" class="view-section">
+            <div class="input-group">
+                <label>OpenRouter API Key</label>
+                <input type="password" id="set-api-key" placeholder="sk-or-...">
+            </div>
+            <div class="input-group">
+                <label>AI Model (OpenRouter ID)</label>
+                <input type="text" id="set-model" placeholder="google/gemini-2.0-flash-lite-preview-02-05:free">
+            </div>
+            <button class="btn-primary" onclick="saveSettings()">
+                <span class="material-icons-round">save_as</span> 儲存設定
+            </button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">單字已新增！</div>
+
+    <script>
+        let currentCorrectId = null;
+        let currentQuestionData = null;
+        let isAnswered = false;
+        
+        // Exam Mode State
+        let examState = {
+            active: false,
+            currentQuestion: 0,
+            totalQuestions: 10,
+            score: 0,
+            mistakes: [] // {term, definition, wrong_choice}
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSets();
+            loadQuiz();
+            loadSettings();
+        });
+
+        // 切換分頁
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            
+            if (tab === 'quiz') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('view-quiz').classList.add('active');
+                loadQuiz();
+            } else if (tab === 'add') {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('view-add').classList.add('active');
+            } else if (tab === 'bulk') {
+                document.querySelector('.tab:nth-child(3)').classList.add('active');
+                document.getElementById('view-bulk').classList.add('active');
+            } else if (tab === 'sets') {
+                document.querySelector('.tab:nth-child(4)').classList.add('active');
+                document.getElementById('view-sets').classList.add('active');
+                loadSets();
+            } else if (tab === 'settings') {
+                document.querySelector('.tab:nth-child(5)').classList.add('active');
+                document.getElementById('view-settings').classList.add('active');
+            }
+        }
+
+        // 載入單字集列表
+        function loadSets() {
+            fetch('/api/sets')
+                .then(res => res.json())
+                .then(sets => {
+                    // Update Quiz Dropdown
+                    const quizSel = document.getElementById('quiz-set-select');
+                    const currentQuizVal = quizSel.value;
+                    quizSel.innerHTML = '<option value="all">全部單字</option>';
+                    
+                    // Update Add/Bulk Dropdowns
+                    const addSel = document.getElementById('add-set-select');
+                    const bulkSel = document.getElementById('bulk-set-select');
+                    const currentAddVal = addSel.value;
+                    const currentBulkVal = bulkSel.value;
+                    
+                    addSel.innerHTML = '';
+                    bulkSel.innerHTML = '';
+
+                    // Update Sets Management List
+                    const list = document.getElementById('sets-list');
+                    list.innerHTML = '';
+
+                    sets.forEach(s => {
+                        // Dropdown options
+                        const opt = `<option value="${s.id}">${s.name}</option>`;
+                        quizSel.innerHTML += opt;
+                        addSel.innerHTML += opt;
+                        bulkSel.innerHTML += opt;
+
+                        // List item
+                        const item = document.createElement('div');
+                        item.className = 'option-btn'; // Reuse style
+                        item.style.display = 'flex';
+                        item.style.justifyContent = 'space-between';
+                        item.style.alignItems = 'center';
+                        item.innerHTML = `
+                            <span>${s.name}</span>
+                            <button onclick="deleteSet(${s.id})" style="background:none; border:none; color:var(--md-error); cursor:pointer;">
+                                <span class="material-icons-round">delete</span>
+                            </button>
+                        `;
+                        list.appendChild(item);
+                    });
+
+                    // Restore selections if possible
+                    if (currentQuizVal) quizSel.value = currentQuizVal;
+                    if (currentAddVal && sets.find(s => s.id == currentAddVal)) addSel.value = currentAddVal;
+                    if (currentBulkVal && sets.find(s => s.id == currentBulkVal)) bulkSel.value = currentBulkVal;
+                });
+        }
+
+        // 建立單字集
+        function createSet() {
+            const name = document.getElementById('inp-new-set').value.trim();
+            if (!name) return;
+
+            fetch('/api/sets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast("單字集已建立");
+                    document.getElementById('inp-new-set').value = '';
+                    loadSets();
+                } else {
+                    showToast(data.message);
+                }
+            });
+        }
+
+        // 刪除單字集
+        function deleteSet(id) {
+            if (!confirm("確定要刪除此單字集嗎？裡面的單字也會被刪除喔！")) return;
+            
+            fetch(`/api/sets/${id}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast("單字集已刪除");
+                    loadSets();
+                }
+            });
+        }
+
+        // 重置並開始測驗
+        function resetQuiz() {
+            const mode = document.getElementById('quiz-mode-select').value;
+            
+            document.getElementById('quiz-container').style.display = 'block';
+            document.getElementById('exam-result').style.display = 'none';
+            document.getElementById('ai-analysis-container').style.display = 'none';
+            
+            if (mode === 'exam') {
+                examState = {
+                    active: true,
+                    currentQuestion: 0,
+                    totalQuestions: 10,
+                    score: 0,
+                    mistakes: []
+                };
+                document.getElementById('exam-progress').style.display = 'block';
+                updateProgress();
+            } else {
+                examState.active = false;
+                document.getElementById('exam-progress').style.display = 'none';
+            }
+            
+            loadQuiz();
+        }
+
+        function updateProgress() {
+            const current = examState.currentQuestion + 1;
+            const total = examState.totalQuestions;
+            document.getElementById('progress-text').textContent = `${current} / ${total}`;
+            document.getElementById('progress-bar').style.width = `${(current / total) * 100}%`;
+        }
+
+        // 載入題目
+        function loadQuiz() {
+            isAnswered = false;
+            document.getElementById('next-btn').style.display = 'none';
+            const container = document.getElementById('options-container');
+            container.style.opacity = '0.5';
+            
+            const setId = document.getElementById('quiz-set-select').value;
+
+            fetch(`/get_quiz?set_id=${setId}`)
+                .then(res => res.json())
+                .then(data => {
+                    container.style.opacity = '1';
+                    
+                    if (data.error) {
+                        document.getElementById('quiz-container').style.display = 'none';
+                        document.getElementById('error-msg').style.display = 'block';
+                        document.getElementById('error-msg').querySelector('p').textContent = data.error;
+                        return;
+                    }
+
+                    document.getElementById('quiz-container').style.display = 'block';
+                    document.getElementById('error-msg').style.display = 'none';
+
+                    currentQuestionData = data; // Save for mistake tracking
+                    document.getElementById('q-term').textContent = data.question.term;
+                    document.getElementById('q-example').textContent = `"${data.question.example}"`;
+                    currentCorrectId = data.correct_id;
+
+                    container.innerHTML = '';
+                    data.options.forEach(opt => {
+                        const btn = document.createElement('div');
+                        btn.className = 'option-btn';
+                        btn.textContent = opt.definition;
+                        btn.onclick = () => checkAnswer(btn, opt.id, opt.definition);
+                        container.appendChild(btn);
+                    });
+                });
+        }
+
+        // 檢查答案
+        function checkAnswer(btn, selectedId, selectedDef) {
+            if (isAnswered) return;
+            isAnswered = true;
+
+            const isCorrect = (selectedId === currentCorrectId);
+            
+            if (isCorrect) {
+                btn.classList.add('correct');
+                if (examState.active) examState.score++;
+            } else {
+                btn.classList.add('wrong');
+                // Record mistake for exam mode
+                if (examState.active) {
+                    // Find correct definition
+                    const correctOpt = currentQuestionData.options.find(o => o.id === currentCorrectId);
+                    examState.mistakes.push({
+                        term: currentQuestionData.question.term,
+                        definition: correctOpt.definition,
+                        wrong_choice: selectedDef
+                    });
+                }
+                
+                // Highlight correct answer
+                document.querySelectorAll('.option-btn').forEach(b => {
+                    if (b.textContent === currentQuestionData.options.find(o => o.id === currentCorrectId).definition) {
+                        b.classList.add('correct');
+                    }
+                });
+            }
+
+            // 總是顯示下一題按鈕
+            document.getElementById('next-btn').style.display = 'flex';
+        }
+
+        function nextQuestion() {
+            if (examState.active) {
+                examState.currentQuestion++;
+                if (examState.currentQuestion >= examState.totalQuestions) {
+                    finishExam();
+                    return;
+                }
+                updateProgress();
+            }
+            loadQuiz();
+        }
+
+        function finishExam() {
+            document.getElementById('quiz-container').style.display = 'none';
+            document.getElementById('exam-result').style.display = 'block';
+            
+            const finalScore = (examState.score / examState.totalQuestions) * 100;
+            document.getElementById('score-display').textContent = Math.round(finalScore);
+            
+            // If there are mistakes, call AI analysis
+            if (examState.mistakes.length > 0) {
+                const aiContainer = document.getElementById('ai-analysis-container');
+                const aiContent = document.getElementById('ai-analysis-content');
+                
+                aiContainer.style.display = 'block';
+                aiContent.textContent = "正在分析您的錯誤並生成建議...";
+                
+                fetch('/analyze_mistakes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mistakes: examState.mistakes })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        // Use marked.parse to render markdown
+                        aiContent.innerHTML = marked.parse(data.analysis);
+                    } else {
+                        aiContent.textContent = "分析失敗: " + data.message;
+                    }
+                })
+                .catch(err => {
+                    aiContent.textContent = "連線錯誤，無法取得 AI 分析。";
+                });
+            }
+        }
+
+        // 新增單字
+        function submitWord() {
+            const term = document.getElementById('inp-term').value;
+            const definition = document.getElementById('inp-def').value;
+            const example = document.getElementById('inp-ex').value;
+            const setId = document.getElementById('add-set-select').value;
+
+            if (!term || !definition) {
+                showToast("請填寫單字和定義");
+                return;
+            }
+
+            fetch('/add_word', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ term, definition, example, set_id: setId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast("單字新增成功！");
+                    // 清空欄位
+                    document.getElementById('inp-term').value = '';
+                    document.getElementById('inp-def').value = '';
+                    document.getElementById('inp-ex').value = '';
+                }
+            });
+        }
+
+        // 批量新增單字
+        function submitBulkWords() {
+            const rawText = document.getElementById('inp-bulk').value;
+            const setId = document.getElementById('bulk-set-select').value;
+            
+            if (!rawText.trim()) {
+                showToast("請輸入內容");
+                return;
+            }
+
+            const lines = rawText.split('\n');
+            const words = [];
+            
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                const parts = line.split('|').map(p => p.trim());
+                if (parts.length >= 2) {
+                    words.push({
+                        term: parts[0],
+                        definition: parts[1],
+                        example: parts[2] || ''
+                    });
+                }
+            });
+
+            if (words.length === 0) {
+                showToast("沒有偵測到有效的單字格式");
+                return;
+            }
+
+            fetch('/add_words_bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ words, set_id: setId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`成功新增 ${data.count} 個單字！`);
+                    document.getElementById('inp-bulk').value = '';
+                } else {
+                    showToast("新增失敗：" + data.message);
+                }
+            })
+            .catch(err => {
+                showToast("發生錯誤");
+                console.error(err);
+            });
+        }
+
+        // 切換批量模式
+        function setBulkMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-mode-${mode}`).classList.add('active');
+            
+            if (mode === 'manual') {
+                document.getElementById('bulk-manual').style.display = 'block';
+                document.getElementById('bulk-ai').style.display = 'none';
+            } else {
+                document.getElementById('bulk-manual').style.display = 'none';
+                document.getElementById('bulk-ai').style.display = 'block';
+            }
+        }
+
+        // AI 批量新增
+        function submitAiWords() {
+            const rawText = document.getElementById('inp-ai-words').value;
+            const setId = document.getElementById('bulk-set-select').value;
+            
+            if (!rawText.trim()) {
+                showToast("請輸入單字列表");
+                return;
+            }
+
+            const words = rawText.split('\n').map(w => w.trim()).filter(w => w);
+            if (words.length === 0) return;
+
+            // UI Loading State
+            const btn = document.getElementById('btn-ai-submit');
+            const loading = document.getElementById('ai-loading');
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            loading.style.display = 'block';
+
+            fetch('/ai_generate_bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ words, set_id: setId })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`AI 成功生成並新增 ${data.count} 個單字！`);
+                    document.getElementById('inp-ai-words').value = '';
+                } else {
+                    showToast("生成失敗：" + data.message);
+                }
+            })
+            .catch(err => {
+                showToast("發生錯誤，請檢查 API Key 或網路");
+                console.error(err);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                loading.style.display = 'none';
+            });
+        }
+
+        // 設定相關
+        function loadSettings() {
+            fetch('/settings')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.api_key) document.getElementById('set-api-key').value = data.api_key;
+                    if (data.model) document.getElementById('set-model').value = data.model;
+                });
+        }
+
+        function saveSettings() {
+            const apiKey = document.getElementById('set-api-key').value.trim();
+            const model = document.getElementById('set-model').value.trim();
+            
+            fetch('/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ api_key: apiKey, model: model })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast("設定已儲存");
+                }
+            });
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
