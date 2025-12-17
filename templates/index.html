@@ -249,18 +249,28 @@
         </div>
 
         <div id="view-quiz" class="view-section active">
-            <div style="margin-bottom: 16px; display: flex; gap: 10px; align-items: center;">
-                <div style="flex: 1;">
-                    <label style="margin-left: 4px;">選擇單字集：</label>
-                    <select id="quiz-set-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
-                        <option value="all">全部單字</option>
-                    </select>
+            <div style="margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="margin-left: 4px;">選擇單字集：</label>
+                        <select id="quiz-set-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                            <option value="all">全部單字</option>
+                            <option value="mistakes">錯題本 (Mistakes)</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="margin-left: 4px;">測驗模式：</label>
+                        <select id="quiz-mode-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                            <option value="learning">學習模式 (無限刷題)</option>
+                            <option value="exam">考試模式 (50題計分)</option>
+                        </select>
+                    </div>
                 </div>
-                <div style="flex: 1;">
-                    <label style="margin-left: 4px;">測驗模式：</label>
-                    <select id="quiz-mode-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
-                        <option value="learning">學習模式 (無限刷題)</option>
-                        <option value="exam">考試模式 (10題計分)</option>
+                <div>
+                    <label style="margin-left: 4px;">題目類型：</label>
+                    <select id="quiz-type-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                        <option value="def">看單字選定義 (Standard)</option>
+                        <option value="cloze">看例句選單字 (Cloze)</option>
                     </select>
                 </div>
             </div>
@@ -280,9 +290,10 @@
                 <div class="quiz-card">
                     <div class="term-display" id="q-term">Loading...</div>
                     <div class="example-display" id="q-example"></div>
+                    <div id="q-feedback" style="display: none; margin-top: 10px; color: var(--md-primary); font-weight: bold;"></div>
                 </div>
                 
-                <h3 style="font-size: 14px; color: var(--md-outline); margin-top: 24px;">選擇正確的定義：</h3>
+                <h3 id="q-instruction" style="font-size: 14px; color: var(--md-outline); margin-top: 24px;">選擇正確的定義：</h3>
                 
                 <div class="options-grid" id="options-container">
                 </div>
@@ -471,7 +482,8 @@
                     // Update Quiz Dropdown
                     const quizSel = document.getElementById('quiz-set-select');
                     const currentQuizVal = quizSel.value;
-                    quizSel.innerHTML = '<option value="all">全部單字</option>';
+                    // Preserve "mistakes" option if it was selected or just re-add it
+                    quizSel.innerHTML = '<option value="all">全部單字</option><option value="mistakes">錯題本 (Mistakes)</option>';
                     
                     // Update Add/Bulk Dropdowns
                     const addSel = document.getElementById('add-set-select');
@@ -563,7 +575,7 @@
                 examState = {
                     active: true,
                     currentQuestion: 0,
-                    totalQuestions: 10,
+                    totalQuestions: 50,
                     score: 0,
                     mistakes: []
                 };
@@ -586,42 +598,99 @@
 
         // 載入題目
         function loadQuiz() {
-            isAnswered = false;
-            document.getElementById('next-btn').style.display = 'none';
-            const container = document.getElementById('options-container');
-            container.style.opacity = '0.5';
-            
-            const setId = document.getElementById('quiz-set-select').value;
+            try {
+                isAnswered = false;
+                const nextBtn = document.getElementById('next-btn');
+                const feedback = document.getElementById('q-feedback');
+                if (nextBtn) nextBtn.style.display = 'none';
+                if (feedback) feedback.style.display = 'none';
+                
+                const container = document.getElementById('options-container');
+                if (container) container.style.opacity = '0.5';
+                
+                const setSelect = document.getElementById('quiz-set-select');
+                const typeSelect = document.getElementById('quiz-type-select');
+                
+                const setId = setSelect ? setSelect.value : 'all';
+                const quizType = typeSelect ? typeSelect.value : 'def';
 
-            fetch(`/get_quiz?set_id=${setId}`)
-                .then(res => res.json())
-                .then(data => {
-                    container.style.opacity = '1';
-                    
-                    if (data.error) {
+                fetch(`/get_quiz?set_id=${setId}`)
+                    .then(res => {
+                        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                        return res.json();
+                    })
+                    .then(data => {
+                        if (container) container.style.opacity = '1';
+                        
+                        if (data.error) {
+                            document.getElementById('quiz-container').style.display = 'none';
+                            const errorMsg = document.getElementById('error-msg');
+                            errorMsg.style.display = 'block';
+                            errorMsg.querySelector('p').textContent = data.error;
+                            return;
+                        }
+
+                        document.getElementById('quiz-container').style.display = 'block';
+                        document.getElementById('error-msg').style.display = 'none';
+
+                        currentQuestionData = data; 
+                        currentCorrectId = data.correct_id;
+
+                        // Render based on Quiz Type
+                        if (quizType === 'cloze') {
+                            // Cloze Mode: Show Example with blank, Options are Terms
+                            document.getElementById('q-term').style.display = 'none';
+                            
+                            // Replace term in example with underscores (case insensitive)
+                            const term = data.question.term;
+                            const example = data.question.example;
+                            const maskedExample = example.replace(new RegExp(term, 'gi'), '_______');
+                            
+                            document.getElementById('q-example').textContent = maskedExample;
+                            document.getElementById('q-example').style.fontStyle = 'normal';
+                            document.getElementById('q-example').style.fontSize = '20px';
+                            
+                            document.getElementById('q-instruction').textContent = '選擇正確的單字填空：';
+                            
+                            container.innerHTML = '';
+                            data.options.forEach(opt => {
+                                const btn = document.createElement('div');
+                                btn.className = 'option-btn';
+                                btn.textContent = opt.term; // Show English Term
+                                btn.onclick = () => checkAnswer(btn, opt.id, opt.term);
+                                container.appendChild(btn);
+                            });
+
+                        } else {
+                            // Standard Mode: Show Term, Options are Definitions
+                            document.getElementById('q-term').style.display = 'block';
+                            document.getElementById('q-term').textContent = data.question.term;
+                            document.getElementById('q-example').textContent = `"${data.question.example}"`;
+                            document.getElementById('q-example').style.fontStyle = 'italic';
+                            document.getElementById('q-example').style.fontSize = '16px';
+                            
+                            document.getElementById('q-instruction').textContent = '選擇正確的定義：';
+
+                            container.innerHTML = '';
+                            data.options.forEach(opt => {
+                                const btn = document.createElement('div');
+                                btn.className = 'option-btn';
+                                btn.textContent = opt.definition; // Show Chinese Definition
+                                btn.onclick = () => checkAnswer(btn, opt.id, opt.definition);
+                                container.appendChild(btn);
+                            });
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Fetch error:', err);
                         document.getElementById('quiz-container').style.display = 'none';
-                        document.getElementById('error-msg').style.display = 'block';
-                        document.getElementById('error-msg').querySelector('p').textContent = data.error;
-                        return;
-                    }
-
-                    document.getElementById('quiz-container').style.display = 'block';
-                    document.getElementById('error-msg').style.display = 'none';
-
-                    currentQuestionData = data; // Save for mistake tracking
-                    document.getElementById('q-term').textContent = data.question.term;
-                    document.getElementById('q-example').textContent = `"${data.question.example}"`;
-                    currentCorrectId = data.correct_id;
-
-                    container.innerHTML = '';
-                    data.options.forEach(opt => {
-                        const btn = document.createElement('div');
-                        btn.className = 'option-btn';
-                        btn.textContent = opt.definition;
-                        btn.onclick = () => checkAnswer(btn, opt.id, opt.definition);
-                        container.appendChild(btn);
+                        const errorMsg = document.getElementById('error-msg');
+                        errorMsg.style.display = 'block';
+                        errorMsg.querySelector('p').textContent = "載入失敗，請檢查網路或伺服器狀態。";
                     });
-                });
+            } catch (e) {
+                console.error("loadQuiz error:", e);
+            }
         }
 
         // 檢查答案
@@ -630,29 +699,55 @@
             isAnswered = true;
 
             const isCorrect = (selectedId === currentCorrectId);
+            const quizType = document.getElementById('quiz-type-select').value;
             
             if (isCorrect) {
                 btn.classList.add('correct');
                 if (examState.active) examState.score++;
+                
+                // Show feedback (Definition) even if correct, for reinforcement in Cloze mode
+                if (quizType === 'cloze') {
+                    const feedback = document.getElementById('q-feedback');
+                    feedback.textContent = `正確意思: ${currentQuestionData.question.definition}`;
+                    feedback.style.display = 'block';
+                    feedback.style.color = 'var(--md-success)';
+                }
+
             } else {
                 btn.classList.add('wrong');
+                
+                // Record Mistake in DB
+                fetch('/record_mistake', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ word_id: currentCorrectId })
+                });
+
                 // Record mistake for exam mode
                 if (examState.active) {
-                    // Find correct definition
                     const correctOpt = currentQuestionData.options.find(o => o.id === currentCorrectId);
                     examState.mistakes.push({
                         term: currentQuestionData.question.term,
-                        definition: correctOpt.definition,
+                        definition: currentQuestionData.question.definition,
                         wrong_choice: selectedDef
                     });
                 }
                 
                 // Highlight correct answer
                 document.querySelectorAll('.option-btn').forEach(b => {
-                    if (b.textContent === currentQuestionData.options.find(o => o.id === currentCorrectId).definition) {
+                    const correctOpt = currentQuestionData.options.find(o => o.id === currentCorrectId);
+                    const correctText = (quizType === 'cloze') ? correctOpt.term : correctOpt.definition;
+                    
+                    if (b.textContent === correctText) {
                         b.classList.add('correct');
                     }
                 });
+
+                // Show Correct Definition Feedback
+                const feedback = document.getElementById('q-feedback');
+                feedback.textContent = `正確意思: ${currentQuestionData.question.definition}`;
+                feedback.style.display = 'block';
+                feedback.style.color = 'var(--md-error)';
             }
 
             // 總是顯示下一題按鈕

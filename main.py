@@ -47,6 +47,13 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS settings 
                  (key TEXT PRIMARY KEY, value TEXT)''')
     
+    # 4. 建立錯題表
+    c.execute('''CREATE TABLE IF NOT EXISTS mistakes 
+                 (word_id INTEGER PRIMARY KEY, 
+                  count INTEGER DEFAULT 1,
+                  last_reviewed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY(word_id) REFERENCES words(id) ON DELETE CASCADE)''')
+    
     # 確保有預設模型
     c.execute("SELECT value FROM settings WHERE key='model'")
     if not c.fetchone():
@@ -110,13 +117,42 @@ def add_words_bulk():
         
     return jsonify({'status': 'success', 'count': count})
 
+@app.route('/record_mistake', methods=['POST'])
+def record_mistake():
+    data = request.json
+    word_id = data.get('word_id')
+    if not word_id:
+        return jsonify({'status': 'error', 'message': 'Word ID required'})
+    
+    conn = get_db_connection()
+    try:
+        # Insert or Update count
+        conn.execute('''INSERT INTO mistakes (word_id, count, last_reviewed) 
+                        VALUES (?, 1, CURRENT_TIMESTAMP) 
+                        ON CONFLICT(word_id) 
+                        DO UPDATE SET count = count + 1, last_reviewed = CURRENT_TIMESTAMP''', 
+                     (word_id,))
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        conn.close()
+
 @app.route('/get_quiz')
 def get_quiz():
     set_id = request.args.get('set_id')
     conn = get_db_connection()
     
-    # 取得單字 (如果有指定 set_id 則過濾)
-    if set_id and set_id != 'all':
+    # 取得單字
+    if set_id == 'mistakes':
+        # Join mistakes table
+        all_words = conn.execute('''
+            SELECT w.* FROM words w 
+            JOIN mistakes m ON w.id = m.word_id 
+            ORDER BY m.last_reviewed ASC
+        ''').fetchall()
+    elif set_id and set_id != 'all':
         all_words = conn.execute('SELECT * FROM words WHERE set_id = ?', (set_id,)).fetchall()
     else:
         all_words = conn.execute('SELECT * FROM words').fetchall()
@@ -124,13 +160,27 @@ def get_quiz():
     conn.close()
 
     if len(all_words) < 4:
+        # If mistakes mode has few words, we might need to supplement with random words? 
+        # Or just return error. For now, return error but maybe handle gracefully in UI.
+        if set_id == 'mistakes':
+             return jsonify({'error': '錯題本單字不足 4 個，請先多練習累積錯題！'})
         return jsonify({'error': 'Not enough words to generate quiz (need at least 4)'})
 
     # 1. 選出正確答案
     correct_word = random.choice(all_words)
     
-    # 2. 選出 3 個干擾項 (不能是正確答案)
-    distractors = random.sample([w for w in all_words if w['id'] != correct_word['id']], 3)
+    # 2. 選出 3 個干擾項
+    # Distractors should come from ALL words in DB to ensure difficulty
+    conn = get_db_connection()
+    all_db_words = conn.execute('SELECT * FROM words').fetchall()
+    conn.close()
+    
+    # Filter out correct word
+    candidates = [w for w in all_db_words if w['id'] != correct_word['id']]
+    if len(candidates) < 3:
+         return jsonify({'error': 'Total database words too few for distractors'})
+         
+    distractors = random.sample(candidates, 3)
     
     # 3. 混合選項
     options = distractors + [correct_word]
@@ -139,9 +189,10 @@ def get_quiz():
     return jsonify({
         'question': {
             'term': correct_word['term'],
+            'definition': correct_word['definition'],
             'example': correct_word['example']
         },
-        'options': [{'id': w['id'], 'definition': w['definition']} for w in options],
+        'options': [{'id': w['id'], 'term': w['term'], 'definition': w['definition']} for w in options],
         'correct_id': correct_word['id']
     })
 
