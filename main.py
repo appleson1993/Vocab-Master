@@ -139,6 +139,18 @@ def record_mistake():
     finally:
         conn.close()
 
+@app.route('/clear_mistakes', methods=['POST'])
+def clear_mistakes():
+    conn = get_db_connection()
+    try:
+        conn.execute('DELETE FROM mistakes')
+        conn.commit()
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)})
+    finally:
+        conn.close()
+
 @app.route('/get_quiz')
 def get_quiz():
     set_id = request.args.get('set_id')

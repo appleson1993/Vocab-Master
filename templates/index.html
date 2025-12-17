@@ -253,10 +253,15 @@
                 <div style="display: flex; gap: 10px;">
                     <div style="flex: 1;">
                         <label style="margin-left: 4px;">選擇單字集：</label>
-                        <select id="quiz-set-select" onchange="resetQuiz()" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
-                            <option value="all">全部單字</option>
-                            <option value="mistakes">錯題本 (Mistakes)</option>
-                        </select>
+                        <div style="display: flex; gap: 8px;">
+                            <select id="quiz-set-select" onchange="resetQuiz()" style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid var(--md-outline); margin-top: 4px;">
+                                <option value="all">全部單字</option>
+                                <option value="mistakes">錯題本 (Mistakes)</option>
+                            </select>
+                            <button id="btn-clear-mistakes" onclick="clearMistakes()" style="display: none; margin-top: 4px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--md-error); background: #FFEBEE; color: var(--md-error); cursor: pointer;" title="清空錯題本">
+                                <span class="material-icons-round">delete_sweep</span>
+                            </button>
+                        </div>
                     </div>
                     <div style="flex: 1;">
                         <label style="margin-left: 4px;">測驗模式：</label>
@@ -563,10 +568,35 @@
             });
         }
 
+        // 清空錯題本
+        function clearMistakes() {
+            if (!confirm("確定要清空所有錯題紀錄嗎？")) return;
+            
+            fetch('/clear_mistakes', { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast("錯題本已清空");
+                    resetQuiz(); // Reload quiz to show empty state or switch back
+                } else {
+                    showToast("清空失敗: " + data.message);
+                }
+            });
+        }
+
         // 重置並開始測驗
         function resetQuiz() {
             const mode = document.getElementById('quiz-mode-select').value;
+            const setId = document.getElementById('quiz-set-select').value;
             
+            // Show/Hide Clear Mistakes Button
+            const clearBtn = document.getElementById('btn-clear-mistakes');
+            if (setId === 'mistakes') {
+                clearBtn.style.display = 'block';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+
             document.getElementById('quiz-container').style.display = 'block';
             document.getElementById('exam-result').style.display = 'none';
             document.getElementById('ai-analysis-container').style.display = 'none';
